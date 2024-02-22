@@ -43,7 +43,7 @@ def transcribe(audio, model_name, history_type, request: gr.Request):
   with open(f"Format_Library/{file_name}", "r") as f:
       role = f.read()
 
-  messages = [{"role": "system", "content": role}]
+  messages = "[INST]" + role + "[/INST]" # temp to get this working with mistral
   ################# Create Dialogue Transcript from Audio Recording and Append(via Whisper)
 
   audio_data, samplerate = sf.read(audio) # read audio from filepath
@@ -65,7 +65,7 @@ def transcribe(audio, model_name, history_type, request: gr.Request):
   if whisper_response is None:
     logger.error('Received empty response from service ' + service_url)
 
-  messages.append({"role": "user", "content": whisper_response})
+  messages.append(' ' + whisper_response)
  
   ###################Call LLM Service in SCS
   openai_api_base = os.getenv('OPENAI_API', 'http://kl-vllm-mistral.kl-test-jenkins.db-team-jenkins.snowflakecomputing.internal:8000/v1') 
