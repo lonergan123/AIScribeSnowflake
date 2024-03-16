@@ -23,8 +23,7 @@ def get_logger(logger_name):
 
 logger = get_logger('service-to-service')
 
-def transcribe(audio, use_test_audio, model_name, history_type, request: gr.Request):
-  global note_transcript
+def transcribe(audio, model_name, history_type, request: gr.Request):
   history_type_map = {
       "History": "Weldon_History_Format.txt",
       "Physical": "Weldon_PE_Note_Format.txt",
@@ -45,18 +44,14 @@ def transcribe(audio, use_test_audio, model_name, history_type, request: gr.Requ
   
   ################# Create Dialogue Transcript from Audio Recording and Append(via Whisper)
   
-  if not use_test_audio:
-    audio_data, samplerate = sf.read(audio) # read audio from filepath
-    
-    ###################Code to convert .wav to .mp3
-    sf.write("audio_files/test.wav", audio_data, samplerate, subtype='PCM_16')
-    sound = AudioSegment.from_wav("audio_files/test.wav")
-    sound.export("audio_files/test.mp3", format="mp3")
-  else:
-    # copy /Test_Audio_Files/Test_Elbow.mp3 to /audio_files/test.mp3
-    subprocess.run(["cp", "Test_Audio_Files/Test_Elbow.mp3", "audio_files/test.mp3"])
-    logger.info("Using test audio file")
-
+  
+  audio_data, samplerate = sf.read(audio) # read audio from filepath
+  
+  ###################Code to convert .wav to .mp3
+  sf.write("audio_files/test.wav", audio_data, samplerate, subtype='PCM_16')
+  sound = AudioSegment.from_wav("audio_files/test.wav")
+  sound.export("audio_files/test.mp3", format="mp3")
+  
   ###################Call Whister Service in SCS
   service_url = os.getenv('WHISPER_API', 'http://whisper-app.kl-test-jenkins.db-team-jenkins.snowflakecomputing.internal:9000/transcripe_stage_audio') 
   logger.info(f'Calling {service_url}')
@@ -71,35 +66,28 @@ def transcribe(audio, use_test_audio, model_name, history_type, request: gr.Requ
 
   # Setup prompt message using mistral format
   
-
-  prompt_txt = "<sr>[INST]" + role + whisper_response + "[/INST]" 
+  prompt_txt = "<s>[INST] " + role + whisper_response + " [/INST]"
   logger.info(f'Prompt Text: {prompt_txt}')
-
+  
   ###################Call LLM Service in SCS
   openai_api_base = os.getenv('OPENAI_API', 'http://kl-vllm-mistral.kl-test-jenkins.db-team-jenkins.snowflakecomputing.internal:8000/v1') 
   logger.info(f'Calling {openai_api_base}')
-  api_headers = {'Content-Type': 'application/json'}
-  
+  api_headers = {'Content-Type': 'application/json'}  
   openai_api_key = "EMPTY"
+  
   client = OpenAI(
     api_key=openai_api_key,
     base_url=openai_api_base,
-    default_headers=api_headers
-)
-  try:
-    response = client.completions.create(
-      model="/models/mistral/",
-      prompt=prompt_txt,
-      max_tokens=500,
-      stream=False,
-      temperature=0
-      )
+    default_headers=api_headers)
 
-    note_transcript = response.choices[0].text.strip() 
-    logger.info(f'Note Transcript: {note_transcript}')
-  except Exception as e:
-    logger.error(f"Error occurred during LLM completion: {str(e)}")
-    note_transcript = "Error occurred during LLM completion"
+  response = client.completions.create(model='/models/mistral/',
+    prompt=prompt_txt,
+    max_tokens=500,
+    stream=False,
+    temperature=0
+    )
+  note_transcript = response.choices[0].text
+  logger.info(f'Note Transcript: {note_transcript}')
 
   ### Word and MB Count
   file_size = os.path.getsize("audio_files/test.mp3")
@@ -115,11 +103,9 @@ def transcribe(audio, use_test_audio, model_name, history_type, request: gr.Requ
 
 my_inputs = [
     gr.Audio(source="microphone", type="filepath"), #Gradio 3.48.0
-    gr.Checkbox(label="Use Test_Elbow.mp3 (overrides mic input)"),
-    # gr.File(file_types=['.mp3', '.wav'], label="Upload Audio File (overrides microphone input - for TESTING)"),
+    #gr.Checkbox(label="Use Test_Elbow.mp3 (overrides mic input)"),
     gr.Dropdown(['mistralai/Mistral-7B-Instruct-v0.2'], value= 'mistralai/Mistral-7B-Instruct-v0.2', label="Summarization LLM"),
     gr.Radio(["History","H+P","Impression/Plan","Full Visit","Handover","Psych","EMS","SBAR","Meds Only"], show_label=False)
-    #gr.Audio(sources=["microphone"],type="numpy"), #Gradio 4.7.1
 ]
 
 #get contents of description.html into a python variable
