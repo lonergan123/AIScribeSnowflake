@@ -1,0 +1,19 @@
+spec:
+  container:
+  - name: jenkins-service-container
+    image: ahsorg-ahsprod.registry.snowflakecomputing.com/db_team_jenkins/kl_test_jenkins/kl_jenkins_repository/jenkins_app
+    volumeMounts:
+    - name: audio-files
+      mountPath: /audio_files
+    env:                                
+      WHISPER_API: http://whisper-app.kl-test-jenkins.db-team-jenkins.snowflakecomputing.internal:9000/transcripe_stage_audio
+      OPENAI_API: http://kl-vllm-mistral.kl-test-jenkins.db-team-jenkins.snowflakecomputing.internal:8000/v1
+  endpoint:
+  - name: jenkins-app
+    port: 7860
+    public: true
+  volume:
+  - name: audio-files
+    source: "@audio_files"
+    uid: 1000
+    gid: 1000
